@@ -1,0 +1,37 @@
+[project]
+name = "ankispiel"
+description = "Daily fresh example sentences with audio for an Anki vocabulary deck."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+dynamic = ["version"]
+dependencies = [
+    "requests",
+    "openai",
+    "pydantic>=2",
+    "kokoro-onnx",
+    "onnxruntime",
+    "soundfile",
+    "huggingface-hub",
+]
+
+[project.urls]
+Repository = "https://github.com/candemircan/ankispiel"
+Issues = "https://github.com/candemircan/ankispiel/issues"
+
+[project.scripts]
+ankispiel = "ankispiel.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "ankispiel/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ankispiel"]
+
+[dependency-groups]
+dev = ["pytest"]
