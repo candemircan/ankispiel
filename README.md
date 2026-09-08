@@ -1,6 +1,6 @@
 # ankispiel
 
-Nightly fresh example sentences (with audio) for an Anki vocabulary deck, via AnkiConnect.
+Daily fresh example sentences with audio for an Anki vocabulary deck.
 
 Every night it takes the cards coming up next, writes fresh example sentences
 with any OpenAI-compatible LLM, and synthesizes pronunciation with a local Kokoro voice.
