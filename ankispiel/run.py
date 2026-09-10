@@ -7,7 +7,7 @@ example sentences are still unseen), so unreviewed cards are not regenerated day
 day. Each note is all-or-nothing; failures are counted and reported, never silent.
 """
 
-import base64, hashlib, json, time
+import base64, hashlib, json, re, time
 from datetime import date
 
 from ankispiel.anki import AnkiConnect
@@ -16,16 +16,18 @@ from ankispiel.llm import generate
 from ankispiel.notify import notify
 from ankispiel.tts import KokoroVoice
 
+_SOUND_RE = re.compile(r"\[sound:([^\]]+)\]")
+
 
 def _pick_notes(anki: AnkiConnect, cfg: AppConfig) -> list[int]:
     deck = f'deck:"{cfg.anki.deck}" note:"{cfg.migrate.new_notetype}"'
     review_cards = anki.invoke("findCards", query=f"{deck} is:review prop:due<=1")
     review_notes = sorted(anki.invoke("cardsToNotes", cards=review_cards))
 
-    window = max(50, cfg.anki.new_notes_per_night * 5)
-    new_cards = anki.invoke("findCards", query=f"{deck} is:new prop:due<={window}")
-    infos = anki.invoke("cardsInfo", cards=new_cards)
-    by_due = sorted(infos, key=lambda c: c["due"])
+    # `prop:due` matches no new card (new cards have a queue position, not a due date),
+    # so take the lowest positions explicitly. Positions advance as cards are reviewed.
+    new_cards = anki.invoke("findCards", query=f"{deck} is:new")
+    by_due = sorted(anki.invoke("cardsInfo", cards=new_cards), key=lambda c: c["due"])
     new_notes = []
     for card in by_due:
         if card["note"] not in new_notes: new_notes.append(card["note"])
@@ -42,6 +44,19 @@ def _note_reps(anki: AnkiConnect, note_id: int) -> int:
     "Total reviews across a note's cards; increases only when the note is reviewed."
     cards = anki.invoke("findCards", query=f"nid:{note_id}")
     return sum(c["reps"] for c in anki.invoke("cardsInfo", cards=cards))
+
+
+def _clean_audio(anki: AnkiConnect, cfg: AppConfig) -> int:
+    "Delete generated audio no note references; returns the number of files removed."
+    notes = anki.invoke("notesInfo", query=f'note:"{cfg.migrate.new_notetype}"')
+    referenced = {name for note in notes for field in note["fields"].values()
+                  for name in _SOUND_RE.findall(field["value"])}
+    removed = 0
+    for name in anki.invoke("getMediaFilesNames", pattern="_ankispiel-*.mp3"):
+        if name not in referenced:
+            anki.invoke("deleteMediaFile", filename=name)
+            removed += 1
+    return removed
 
 
 def run(cfg: AppConfig, quiet: bool = False) -> None:
@@ -105,11 +120,12 @@ def run(cfg: AppConfig, quiet: bool = False) -> None:
     history_path.parent.mkdir(parents=True, exist_ok=True)
     history_path.write_text(json.dumps(history, ensure_ascii=False, indent=1))
 
+    cleaned = _clean_audio(anki, cfg)
     anki.invoke("sync")
 
     seconds = time.perf_counter() - started
     body = (
-        f"refreshed: {refreshed}, failed: {len(failed)}, skipped: {skipped}\n"
+        f"refreshed: {refreshed}, failed: {len(failed)}, skipped: {skipped}, media cleaned: {cleaned}\n"
         f"tokens: {prompt_tokens} in / {completion_tokens} out"
     )
     if cfg.provider.input_price_per_mtok is not None:

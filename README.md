@@ -6,7 +6,7 @@ Every night it takes the cards coming up next, writes fresh example sentences
 with any OpenAI-compatible LLM, and synthesizes pronunciation with a local Kokoro voice.
 This way you do not end up memorising example sentences while progressing through your deck.
 
-![card example](https://raw.githubusercontent.com/candemircan/ankispiel/v0.1.0/assets/example.png)
+![card example](https://raw.githubusercontent.com/candemircan/ankispiel/v2026.9.10/assets/example.png)
 
 ## Install
 
