@@ -64,6 +64,7 @@ def run(cfg: AppConfig, quiet: bool = False) -> None:
     anki.invoke("sync")
 
     history_path = STATE_DIR / "history.json"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
     history = json.loads(history_path.read_text()) if history_path.exists() else {}
     today = date.today().isoformat()
     voice = KokoroVoice(cfg.tts[cfg.languages.target])
@@ -110,15 +111,14 @@ def run(cfg: AppConfig, quiet: bool = False) -> None:
             anki.invoke("updateNoteFields", note={"id": note_id, "fields": new_fields})
 
             history[str(note_id)] = dict(date=today, reps=reps, sentences=((entry or {}).get("sentences", []) + generated.sentences)[-k:])
+            # Persist per note so an interrupted run resumes instead of redoing finished notes.
+            history_path.write_text(json.dumps(history, ensure_ascii=False, indent=1))
             refreshed += 1
             if not quiet: print(f"[{idx}/{total}] {target_word}  ({pt}+{ct} tok)", flush=True)
             if cfg.provider.request_delay: time.sleep(cfg.provider.request_delay)
         except Exception as e:
             failed.append(f"{note_id}: {e}")
             if not quiet: print(f"[{idx}/{total}] {note_id} FAILED: {e}", flush=True)
-
-    history_path.parent.mkdir(parents=True, exist_ok=True)
-    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=1))
 
     cleaned = _clean_audio(anki, cfg)
     anki.invoke("sync")
